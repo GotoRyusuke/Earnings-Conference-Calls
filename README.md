@@ -9,4 +9,4 @@ An `.xlsx` file will be created to store the information, including the title, y
 
 # Updates
 ## (R6/05/03) Updates
-The scraper module is now available for tests. Follow a [Test file](../test_crawler.py) to explore the functions. 
+The scraper module is now available for tests. Follow a [Test file](../blob/main/test_crawler.py) to explore the functions. 
