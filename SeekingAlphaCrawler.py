@@ -93,6 +93,7 @@ class RawHTMLCrawler:
             print('#TICKERS LEFT: ', self.num_tics - tic_count)
             tic_count += 1
 
+            self.df = df
         return df
 
 
