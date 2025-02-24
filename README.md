@@ -1,7 +1,7 @@
 # Toolkit for Earnings Conference calls
 This project provides modules for scraping [SeekingAlpha](https://seekingalpha.com/) along with processing transcripts and recordings (in `.mp3` format) scraped from the same website.
 The workflow goes as:
-1. Provided with a list of company tickers (optional), the `RawHTMLCrawler`(./SeekingALphaCrawler.py#L82) module will go through all available records for each company in the list and identify earnings conference calls.
+1. Provided with a list of company tickers (optional), the `RawHTMLCrawler`(SeekingALphaCrawler.py#L82) module will go through all available records for each company in the list and identify earnings conference calls.
 An `.xlsx` file will be created to store the information, including the title, year, quarter, URL, and unique transcript ID assigned by SeekingAlpha to each record.
 2. Using the information in Step 1, especifically the URLs, *transcripts* and *recordings* (if any) can be downloaded using the `HTMLRawContentsSaver`(./SeekingALphaCrawler.py#L173) and the `MP3Saver`(./SeekingALphaCrawler.py#L225) module, respectively.
 3. After saving HTML files of transcripts of conference calls, you can use the `HTMLContentsOrganiser` to get preprocessed transcripts of all these conference calls
@@ -10,7 +10,7 @@ An `.xlsx` file will be created to store the information, including the title, y
 ## (R7/02/24) Updates
 Several collaps are solved. Loggings are now available to track the working status.
 ## (R6/05/03) Updates
-The scraper module is now available for tests. Follow a [`test file`](./test_crawler.py) to explore the modules.
+The scraper module is now available for tests. Follow a [`test file`](test_crawler.py) to explore the modules.
 
 # Structure
 ## SeekingAlphaCrawler
