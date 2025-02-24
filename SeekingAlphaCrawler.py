@@ -1,3 +1,59 @@
+'''
+Seeking Alpha Earnings Call Crawler
+=================================
+
+This module provides functionality to crawl and process earnings call transcripts 
+from SeekingAlpha.com, including HTML content and MP3 recordings.
+
+Author: GOTO Ryusuke 
+Update: R70224
+
+├── Imports
+│   ├── Standard Library
+│   │   ├── os
+│   │   ├── re
+│   │   ├── time
+│   │   ├── random
+│   │   ├── warnings
+│   │   └── logging
+│   ├── Third-party
+│   │   ├── requests
+│   │   ├── pandas
+│   │   ├── tqdm
+│   │   ├── BeautifulSoup
+│   │   └── selenium.webdriver
+│   └── Local
+│       └── utils
+│           ├── organise_posting
+│           ├── load_UA_list
+│           ├── get_transcript_html
+│           ├── organise_single_html
+│           └── raw_content_dir_decoder
+│
+├── Configuration
+│   ├── warnings.filterwarnings
+│   └── logging.basicConfig
+│
+├── Class: RawHTMLCrawler
+│   ├── __init__(tic_list)
+│   ├── get_art_list_single_tic(tic)
+│   └── get_art_list_multi_tics(tic_list, tic_start)
+│
+├── Class: HTMLRawContentsSaver
+│   ├── __init__(user_agent_list_dir, save_master_dir, raw_content_df_dir)
+│   ├── save_by_tic(tic)
+│   └── save()
+│
+├── Class: MP3Saver
+│   ├── __init__(user_agent_list_dir, save_master_dir, raw_content_df_dir)
+│   └── save_by_tic(tic)
+│
+└── Class: HTMLContentsOrganiser
+    ├── __init__(save_master_dir, local_dir_df_dir, speech_master_dir)
+    ├── gen_local_dirs()
+    ├── process_single_tic(tic)
+    └── process()
+'''
 
 import os
 import re
@@ -8,24 +64,36 @@ import pandas as pd
 from tqdm import tqdm
 from bs4 import BeautifulSoup
 from selenium import webdriver
-from utils import organise_posting, load_UA_list, get_transcript_html, organise_single_html
+import logging
+from utils import organise_posting, load_UA_list, get_transcript_html, organise_single_html, raw_content_dir_decoder
 import warnings
 
 warnings.filterwarnings('ignore')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('crawler.log'),
+        logging.StreamHandler()
+    ]
+)
 
 
 class RawHTMLCrawler:
     def __init__(
             self,
-            tic_list,
+            tic_list=None,
             ):
         
-        self.tic_list = tic_list
-        self.num_tics = len(tic_list)
+        if tic_list:
+            self.tic_list = tic_list
+            self.num_tics = len(tic_list)
+        else:
+            logging.info('Initialised without TICs')
     
     def get_art_list_single_tic(self, tic):
-        print('-'*20)
-        print(f'TARGET TICKER: {tic}')
+        logging.info('-'*20)
+        logging.info(f'TARGET TICKER: {tic}')
         url = f'https://seekingalpha.com/symbol/{tic}/earnings/transcripts'
         df = pd.DataFrame()
         keep_on = True
@@ -52,7 +120,7 @@ class RawHTMLCrawler:
                         if len(tmp_art_list) != 0:
                             tmp_df = organise_posting(art_list=tmp_art_list)
                             df = pd.concat([df, tmp_df])
-                            print('-'*page, f'PAGE {page}')
+                            logging.info('-'*page+f'PAGE {page}')
                             page += 1
                         else:
                             keep_on = False
@@ -69,28 +137,33 @@ class RawHTMLCrawler:
         df['ticker'] = tic
         df = df.sort_values(by=['year', 'quarter']).reset_index(drop=True)
 
-        print('-'*page,'END')
-        print('RECORDS FOUND: ', len(df))
-        print('PAGES FOUND: ', page)
+        logging.info('-'*page+'END')
+        logging.info(f'RECORDS FOUND: {len(df)}')
+        logging.info(f'PAGES FOUND: {page-1}')
+
         return df
     
-    def get_art_list_multi_tics(self, tic_start=0):
-        print('///////// START SCRAPING ////////')
-        print('#TICKERS: ', self.num_tics)
-        print('START FROM: ', tic_start)
+    def get_art_list_multi_tics(self, tic_list=None, tic_start=0):
+        if self.tic_list:
+            tic_list = self.tic_list
+        num_tics = len(tic_list)
+
+        logging.info('///////// START SCRAPING ////////')
+        logging.info('#TICKERS: ', self.num_tics)
+        logging.info('START FROM: ', tic_start)
 
         tic_count = tic_start
         df = pd.DataFrame()
         
-        for tic in self.tic_list[tic_start:]:
+        for tic in tic_list[tic_start:]:
             
             tmp_df = self.get_art_list_single_tic(tic=tic)
             df = pd.concat([df, tmp_df])
             df.reset_index(drop=True, inplace=True)
             df.to_excel(f'Raw_backup_start{tic_start}.xlsx', index=False)
 
-            print(f'TIC NO.{tic_count} FINISHED')
-            print('#TICKERS LEFT: ', self.num_tics - tic_count)
+            logging.info(f'TIC NO.{tic_count} FINISHED')
+            logging.info(f'#TICKERS LEFT: {num_tics - tic_count}', )
             tic_count += 1
 
             self.df = df
@@ -101,37 +174,49 @@ class HTMLRawContentsSaver:
     def __init__(
             self,
             user_agent_list_dir,
-            store_master_dir,
+            save_master_dir,
             raw_content_df_dir,
             ):
         
         self.user_agent_list = load_UA_list(user_agent_list_dir)
-        self.store_master_dir = store_master_dir     
-        self.raw_df = pd.read_csv(raw_content_df_dir)
+        self.save_master_dir = save_master_dir
+
+        decoder = raw_content_dir_decoder(raw_content_df_dir)  
+        self.raw_df = decoder(raw_content_df_dir)
     
     def save_by_tic(self, tic):
-        tic_df = self.raw_df[self.raw_df['std_tic'] == tic]
+        logging.info('-'*20)
+        logging.info(f'TARGET TICKER: {tic}')
+        tic_df = self.raw_df[self.raw_df['ticker'] == tic]
         local_folder_dir = '/'.join(
-            [self.store_master_dir, tic]
+            [self.save_master_dir, tic]
             )
         os.makedirs(local_folder_dir, exist_ok=True)
         local_dir_list = []
         for idx in tic_df.index:
             title = tic_df.loc[idx, 'title']
+            title = title.replace('/', '-')
+            logging.info(f'Saving {title}')
             url = tic_df.loc[idx, 'url']
             
             local_dir = local_folder_dir + '/' + title + '.txt'
             local_dir_list.append(local_dir)
-            trans_html = get_transcript_html(url, user_agent=random.choice(self.user_agent_list) )
+            
+            while True:
+                trans_html = get_transcript_html(url, user_agent=random.choice(self.user_agent_list))
+                if 'Press & Hold' not in trans_html:
+                    break
+                logging.warning('Encountered Press & Hold, retrying...')
+                time.sleep(10)
             with open(local_dir, 'w', encoding='u8') as f:
                 f.write(trans_html)
             
-            time.sleep(3)
-        
+            time.sleep(10)
+        logging.info(f'END OF {tic}')
         self.raw_df.loc[tic_df.index, 'local_dir'] = local_dir_list
     
     def save(self):
-        tic_list = self.raw_df['std_tic'].drop_duplicates().to_list()
+        tic_list = self.raw_df['ticker'].drop_duplicates().to_list()
         
         for tic in tic_list:
             self.save_by_tic(tic)
@@ -141,24 +226,24 @@ class MP3Saver:
     def __init__(
             self,
             user_agent_list_dir,
-            store_master_dir,
+            save_master_dir,
             raw_content_df_dir,
             ):
             
         self.user_agent_list = load_UA_list(user_agent_list_dir)
-        self.store_master_dir = store_master_dir     
+        self.save_master_dir = save_master_dir     
         self.raw_df = pd.read_parquet(raw_content_df_dir)  
         
     def save_by_tic(self, tic):
         tic_df = self.raw_df[self.raw_df['ticker'] == tic]
         local_folder_dir = '/'.join(
-            [self.store_master_dir, tic]
+            [self.save_master_dir, tic]
             )
         os.makedirs(local_folder_dir, exist_ok=True)
         local_dir_list = []
         
         keep_on = True
-        start = list(tic_df.index)[0]+19
+        start = list(tic_df.index)[0]
         end = list(tic_df.index)[-1]
         idx = start
         
@@ -176,11 +261,11 @@ class MP3Saver:
                 with open(local_dir, "wb") as file:
                     file.write(response.content)
                 self.raw_df.loc[idx, 'mp3_local_dir'] = local_dir
-                print(f'{tic}: {idx} in {start}-{end}')
+                logging.info(f'{tic}: {idx} in {start}-{end}')
                 idx += 1
             elif response.status_code == 404:
                 idx += 1
-                print(f'No recording for {trans_id}')
+                logging.warning(f'No recording for {trans_id}')
                 
             if idx > end:
                 keep_on = False
@@ -196,7 +281,8 @@ class HTMLContentsOrganiser:
             speech_master_dir,
             ):
         self.save_master_dir = save_master_dir
-        self.local_dir_df = pd.read_csv(local_dir_df_dir)
+        decoder = raw_content_dir_decoder(local_dir_df_dir)
+        self.local_dir_df = decoder(local_dir_df_dir)
         self.speech_master_dir = speech_master_dir
     
     def gen_local_dirs(self):
@@ -263,21 +349,3 @@ class HTMLContentsOrganiser:
                 self.local_dir_df['tic'] == tic,
                 'cleaned_dir'
                 ] = success_dir_list
-            
-            
-if __name__ == '__main__':
-
-    
-    ## test HTMLContentsOrganiser
-    save_master_dir = 'F:/Seeking Alpha Crawler/raw_transcripts'
-    local_dir_df_dir = './2021-2023_saved_transcripts.csv'
-    speech_master_dir = 'F:/Seeking Alpha Crawler/cleaned data'
-
-    organiser = HTMLContentsOrganiser(save_master_dir, local_dir_df_dir, speech_master_dir) 
-    # test = organiser.process_single_tic('A')
-    organiser.process()
-    organiser.local_dir_df.to_csv('./2021-20223_cleaned_transcripts.csv', index=False)
-    # organiser.local_dir_df.to_csv('F:/Seeking Alpha Crawler/second_round_local_dirs.csv', index=False)
-    
-    
-    
