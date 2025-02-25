@@ -5,7 +5,7 @@ The workflow goes as:
 An `.xlsx` file will be created to store the information, including the title, year, quarter, URL, and unique transcript ID assigned by SeekingAlpha to each record.
 2. Using the information in Step 1, especifically the URLs, *transcripts* and *recordings* (if any) can be downloaded using the ~~[`HTMLRawContentsSaver`](https://github.com/GotoRyusuke/Earnings-Conference-Calls/blob/main/Savers.py#L173)~~(**not recommeded**) and the [`MP3Saver`](https://github.com/GotoRyusuke/Earnings-Conference-Calls/blob/main/Savers.py#L225) module, respectively.
 3. **(Refer to R70225 Updates for the lastest instruction)** After saving HTML files of transcripts of conference calls, you can use the [`HTMLContentsOrganiser`](https://github.com/GotoRyusuke/Earnings-Conference-Calls/blob/main/Parsers.py#L276) to get preprocessed transcripts of all these conference calls.
-4. Alternatively, if have access to LSEG, you can follow my lastest progress on a module to parse transcritps downloaded from there. See ['TXTContentOrganiser'](https://github.com/GotoRyusuke/Earnings-Conference-Calls/blob/main/Parsers.py#L356). 
+4. Alternatively, if have access to LSEG, you can follow my lastest progress on a module to parse transcritps downloaded from there. See [`TXTContentOrganiser`](https://github.com/GotoRyusuke/Earnings-Conference-Calls/blob/main/Parsers.py#L356). 
 
 # Updates
 ## (R7/02/25) Updates
@@ -20,6 +20,7 @@ Several collapses are solved. Loggings are now available to track the working st
 The scraper module is now available for tests. Follow a [`test file`](test.py) to explore the modules.
 
 # Structure
+```
 Project Root
 │
 ├── Savers.py
@@ -76,7 +77,7 @@ Project Root
 │ ├── Functions
 │ ├── load_UA_list(file_path)
 │ └── raw_content_dir_decoder(local_dir_df_dir)
-
+```
 
 
 
