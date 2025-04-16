@@ -21,9 +21,15 @@ Parsers.py
 │   ├── gen_part_dict(idx_dict, paras, mode)
 │   ├── organise_paragraphs(paras)
 │   ├── gen_participant_info_df(participants_info)
-│   └── extract_participants(file_path)
-│
+│   ├── extract_participants(file_path)
+│   ├── get_post_list(tree)
+│   ├── process_post(post)
+│   ├── process_html(file)
+│   └──
 └── Classes
+    ├──CCHistoryOrganiser
+    │  ├── __init__(self)
+    │  ├── get_post_list(self, file)
     ├── HTMLContentsOrganiser
     │   ├── __init__(self, save_master_dir, local_dir_df_dir, speech_master_dir)
     │   ├── gen_local_dirs(self)
@@ -42,6 +48,7 @@ import logging
 import pandas as pd
 from bs4 import BeautifulSoup
 from utils import raw_content_dir_decoder
+from dateutil import parser
 
 logging.basicConfig(
     level=logging.INFO,
@@ -271,6 +278,60 @@ def extract_participants(file_path):
                 participants.append(line)
     
     return participants
+
+def get_post_list(tree):
+    return tree.find('div', attrs={'data-test-id':'post-list'}).find_all('article')
+
+def process_post(post):
+    # find transcript title
+    title = post.find('h3').text
+    # find transcript url
+    url = post.find('h3').find('a').get('data-savepage-href').split('#source')[0]
+    # find transcript ID
+    transcript_id = int(url.split('-')[0].replace('/article/', '').strip())
+    # find ticker
+    try:
+        ticker = post.find('footer').find('a', attrs={'data-test-id':'post-list-ticker'}).text
+    except AttributeError:
+        ticker = 'missing'
+    # find post date
+    post_date = post.find('footer').find('span', attrs={'data-test-id':'post-list-date'}).text
+    try:
+        post_date = parser.parse(post_date).strftime("%Y-%m-%d")
+    except:
+        pass
+    
+    return {
+        'title': title,
+        'url': url,
+        'ID': transcript_id,
+        'ticker': ticker,
+        'date': post_date,
+        }
+
+def process_html(file):
+    with open(file, 'r', encoding='u8') as f:
+        content = f.read()
+    
+    tree = BS(content, features="lxml")
+    post_list = get_post_list(tree)
+    post_df = pd.DataFrame(
+        columns=['ticker', 'ID', 'date', 'title', 'url', 'filename'],
+        index=range(len(post_list))
+        )
+    
+    for idx in post_df.index:
+        for key, item in process_post(post_list[idx]).items():
+            post_df.loc[idx, key] = item
+    
+    post_df['filename'] = file
+
+class CCHistoryOrganiser:
+    def __init__(self):
+        pass
+
+    def get_post_list(self, file):
+        return process_html(file)
 
 
 class HTMLContentsOrganiser:
