@@ -1,3 +1,4 @@
 *.pyc
 utils.log
 crawler.log
+*.log

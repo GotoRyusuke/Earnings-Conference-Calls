@@ -32,6 +32,7 @@ import time
 import random
 import logging
 import requests
+import pandas as pd
 from selenium import webdriver
 from bs4 import BeautifulSoup
 from selenium.webdriver.chrome.options import Options
@@ -160,10 +161,16 @@ class MP3Saver:
         self.user_agent_list = load_UA_list(user_agent_list_dir)
         self.save_master_dir = save_master_dir     
         self.raw_df = pd.read_parquet(raw_content_df_dir)  
+
         
     def save_by_tic(self, tic):
         logging.info(f'RETRIEVING MP3 FOR {tic}')
         tic_df = self.raw_df[self.raw_df['ticker'] == tic]
+        tic_df['year'] = tic_df['date'].str.split('-').str[0].astype(int)
+        tic_df = tic_df[tic_df['year'] > 2016]
+
+        if len(tic_df) == 0: return None
+        
         local_folder_dir = '/'.join(
             [self.save_master_dir, tic]
             )
@@ -188,16 +195,20 @@ class MP3Saver:
                 local_dir_list.append(local_dir)
                 with open(local_dir, "wb") as file:
                     file.write(response.content)
-                self.raw_df.loc[idx, 'mp3_local_dir'] = local_dir
+                tic_df.loc[idx, 'mp3_local_dir'] = local_dir
                 logging.info(f'{tic}: {idx} in {start}-{end}')
-                idx += 1
+                idx += 1 
             elif response.status_code == 404:
-                idx += 1
+                idx += 1 
                 logging.warning(f'No recording for {trans_id}')
-                
+            else:
+                print(response.status_code)
+                time.sleep(30)
+             
             if idx > end:
                 keep_on = False
             
             time.sleep(4)
 
         logging.info(f'END OF {tic}')
+        tic_df.to_parquet(f'{local_folder_dir}/{tic}_recordings.parquet')
