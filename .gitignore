@@ -2,3 +2,4 @@
 utils.log
 crawler.log
 *.log
+test.py
